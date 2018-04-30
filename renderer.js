@@ -2,26 +2,64 @@
 var ws = new WebSocket('ws://localhost:4000');
 
 var SENSOR_IDS = {
-  'engine-temperature': 1,
+  'engine_temperature': 1,
   'latitude': 2,
   'longitude': 3,
-  'speed': 4
+  'speed': 4,
+  'brake_pedal': 5,
+  'gas_pedal': 6,
+  'suspension': 7,
+  'transmission_temperature': 8,
+  'rpm': 9,
+  'sos': 10,
 }
 
 function updateSensors(data) {
-  let { sensor, value, ts } = data;
-  if (!SENSOR_IDS[sensor]) {
-    console.log('Invalid sensor id');
-    return;
+  for (var key in data) {
+    if (data.hasOwnProperty(key)) {
+      let { type, value, ts, triggers } = data[key];
+      if (!SENSOR_IDS[key]) {
+        console.log('Invalid sensor id');
+      } else {
+        var sensorElementId = 'sensor-' + SENSOR_IDS[key];
+        var sensorReadingElementId = 'sensor-' + SENSOR_IDS[key] + '-reading';
+        var sensorTimeElementId = 'sensor-' + SENSOR_IDS[key] + '-reading-time';
+
+        let changeColor = false;
+
+        for (let i=0; i < triggers.length; i++) {
+          if (type === "inactive") {
+            changeColor = true;
+            document.getElementById(sensorElementId).style.border = "3px solid #FF0054";
+            break;
+          } else if (key !== 'sos' && (value < triggers[i].value)) {
+            changeColor = true;
+            switch (triggers[i].name) {
+              case("danger"):
+                document.getElementById(sensorElementId).style.border = "3px solid #FF0054";
+                break;
+              case("warning"):
+                document.getElementById(sensorElementId).style.border = "3px solid #FFAE42";
+                break;
+            }
+            break;
+          } else if (key === 'sos') {
+            if (value === '1') {
+              changeColor = true;
+              document.getElementById(sensorElementId).style.border = "3px solid #FF0054";
+            }
+          }
+        }
+
+        if (!changeColor) {
+          document.getElementById(sensorElementId).style.border = "3px solid #81D3B7";
+        }
+      
+        document.getElementById(sensorReadingElementId).innerText = value;
+        document.getElementById(sensorTimeElementId).innerText = ts;
+      }
+    }
   }
-
-
-  var sensorReadingElementId = 'sensor-' + SENSOR_IDS[sensor] + '-reading';
-  var sensorTimeElementId = 'sensor-' + SENSOR_IDS[sensor] + '-reading-time';
-
-  document.getElementById(sensorReadingElementId).innerText = value;
-  document.getElementById(sensorTimeElementId).innerText = ts;
-
 }
 
 var heartbeatTimeouts = [];
@@ -66,8 +104,6 @@ ws.onmessage = function (message) {
   if (data['heartbeat']) {
     return registerHeartBeat();
   }
-
-  // console.log(data);
 
   updateSensors(data);
 };
